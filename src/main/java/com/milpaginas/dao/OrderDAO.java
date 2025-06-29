@@ -4,7 +4,7 @@ import com.milpaginas.model.Order;
 import com.milpaginas.model.OrderItem;
 import com.milpaginas.model.Book;
 import com.milpaginas.model.User;
-import com.milpaginas.util.DatabaseConnection;
+import com.milpaginas.util.DatabaseConnectionPool;
 import com.milpaginas.util.ValidationUtil;
 
 import java.sql.*;
@@ -16,12 +16,8 @@ public class OrderDAO {
     private UserDAO userDAO = new UserDAO();
     private BookDAO bookDAO = new BookDAO();
     
-    public Order save(Order order) throws SQLException {
-        Connection conn = null;
+    public Order save(Order order, Connection conn) throws SQLException {
         try {
-            conn = DatabaseConnection.getConnection();
-            conn.setAutoCommit(false);
-            
             String orderSql = "INSERT INTO pedidos (usuario_id, endereco_entrega, valor_total, observacoes, status_pedido) VALUES (?, ?, ?, ?, ?)";
             
             try (PreparedStatement orderStmt = conn.prepareStatement(orderSql, Statement.RETURN_GENERATED_KEYS)) {
@@ -59,20 +55,9 @@ public class OrderDAO {
                 }
                 itemStmt.executeBatch();
             }
-            
-            conn.commit();
             return order;
-            
         } catch (SQLException e) {
-            if (conn != null) {
-                conn.rollback();
-            }
             throw e;
-        } finally {
-            if (conn != null) {
-                conn.setAutoCommit(true);
-                DatabaseConnection.closeConnection(conn);
-            }
         }
     }
     
@@ -81,7 +66,7 @@ public class OrderDAO {
                     "JOIN usuarios u ON p.usuario_id = u.id " +
                     "WHERE p.id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, id);
@@ -105,7 +90,7 @@ public class OrderDAO {
         
         List<Order> orders = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);
@@ -129,7 +114,7 @@ public class OrderDAO {
         
         List<Order> orders = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             
@@ -150,7 +135,7 @@ public class OrderDAO {
         
         List<Order> orders = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, status.name());
@@ -170,7 +155,7 @@ public class OrderDAO {
     public void updateStatus(int orderId, Order.OrderStatus newStatus) throws SQLException {
         String sql = "UPDATE pedidos SET status_pedido = ? WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, newStatus.name());
@@ -191,7 +176,7 @@ public class OrderDAO {
         
         List<OrderItem> items = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, orderId);
@@ -225,7 +210,7 @@ public class OrderDAO {
     public long countByStatus(Order.OrderStatus status) throws SQLException {
         String sql = "SELECT COUNT(*) FROM pedidos WHERE status_pedido = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, status.name());
@@ -243,7 +228,7 @@ public class OrderDAO {
     public long countByUser(int userId) throws SQLException {
         String sql = "SELECT COUNT(*) FROM pedidos WHERE usuario_id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);

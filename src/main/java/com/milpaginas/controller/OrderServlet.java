@@ -7,6 +7,7 @@ import com.milpaginas.model.Order;
 import com.milpaginas.model.OrderItem;
 import com.milpaginas.model.CartItem;
 import com.milpaginas.model.Book;
+import com.milpaginas.util.DatabaseConnectionPool;
 import com.milpaginas.util.ValidationUtil;
 
 import javax.servlet.ServletException;
@@ -16,6 +17,7 @@ import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
 
@@ -163,32 +165,34 @@ public class OrderServlet extends HttpServlet {
     }
     
     private void createOrder(HttpServletRequest request, HttpServletResponse response) 
-            throws SQLException, ServletException, IOException {
+            throws ServletException, IOException {
         
         int userId = getUserId(request);
         String enderecoEntrega = ValidationUtil.validateAndSanitize(
                 request.getParameter("enderecoEntrega"), "Endereço de entrega");
         String observacoes = ValidationUtil.sanitizeString(request.getParameter("observacoes"));
         
-        List<CartItem> cartItems = cartDAO.findByUserId(userId);
-        
-        if (cartItems.isEmpty()) {
-            request.setAttribute("error", "Carrinho vazio");
-            response.sendRedirect("cart");
-            return;
-        }
-        
+        Connection conn = null;
         try {
+            conn = DatabaseConnectionPool.getConnection();
+            conn.setAutoCommit(false);
+
+            List<CartItem> cartItems = cartDAO.findByUserId(userId);
+            
+            if (cartItems.isEmpty()) {
+                request.setAttribute("error", "Carrinho vazio");
+                response.sendRedirect("cart");
+                return;
+            }
+            
             Order order = new Order(userId, enderecoEntrega);
             order.setObservacoes(observacoes);
             
             for (CartItem cartItem : cartItems) {
-                Book book = bookDAO.findById(cartItem.getLivroId());
+                Book book = bookDAO.findById(cartItem.getLivroId(), true); // Lock for update
                 if (book == null || book.getQuantidadeEstoque() < cartItem.getQuantidade()) {
-                    request.setAttribute("error", "Produto indisponível: " + 
+                    throw new SQLException("Produto indisponível: " + 
                             (book != null ? book.getTitulo() : "Livro não encontrado"));
-                    showCheckout(request, response);
-                    return;
                 }
                 
                 OrderItem orderItem = new OrderItem(
@@ -201,7 +205,7 @@ public class OrderServlet extends HttpServlet {
                 order.addItem(orderItem);
             }
             
-            orderDAO.save(order);
+            orderDAO.save(order, conn);
             
             for (CartItem cartItem : cartItems) {
                 bookDAO.decreaseStock(cartItem.getLivroId(), cartItem.getQuantidade());
@@ -209,13 +213,30 @@ public class OrderServlet extends HttpServlet {
             
             cartDAO.clearCart(userId);
             
+            conn.commit();
+            
             request.setAttribute("success", "Pedido realizado com sucesso!");
             response.sendRedirect("orders?action=view&id=" + order.getId());
             
         } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    conn.rollback();
+                } catch (SQLException ex) {
+                    ex.printStackTrace();
+                }
+            }
             e.printStackTrace();
             request.setAttribute("error", "Erro ao processar pedido: " + e.getMessage());
-            showCheckout(request, response);
+            request.getRequestDispatcher("/checkout.jsp").forward(request, response);
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.close();
+                } catch (SQLException e) {
+                    e.printStackTrace();
+                }
+            }
         }
     }
     
@@ -269,7 +290,7 @@ public class OrderServlet extends HttpServlet {
             orderDAO.updateStatus(orderId, newStatus);
             response.sendRedirect("orders?action=admin");
             
-        } catch (NumberFormatException | IllegalArgumentException e) {
+        } catch (IllegalArgumentException e) {
             response.sendRedirect("orders?action=admin");
         }
     }

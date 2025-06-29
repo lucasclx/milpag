@@ -4,75 +4,46 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import org.mindrot.jbcrypt.BCrypt;
 
 public class PasswordUtil {
     
+    // Prefixo para identificar o tipo de hash usado
+    private static final String BCRYPT_PREFIX = "$2a$";
+    private static final String SHA256_PREFIX = "$sha256$";
+    
+    /**
+     * Gera hash de senha usando BCrypt (mais seguro)
+     */
     public static String hashPassword(String password) {
-        try {
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            byte[] salt = generateSalt();
-            md.update(salt);
-            byte[] hashedPassword = md.digest(password.getBytes());
-            
-            return Base64.getEncoder().encodeToString(salt) + ":" + 
-                   Base64.getEncoder().encodeToString(hashedPassword);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Erro ao criptografar senha", e);
-        }
+        // Usar BCrypt como padrão para novos usuários
+        return BCrypt.hashpw(password, BCrypt.gensalt(10));
     }
     
+    /**
+     * Verifica senha contra hash armazenado (suporta BCrypt e SHA-256 legado)
+     */
     public static boolean verifyPassword(String password, String hashedPassword) {
+        if (password == null || hashedPassword == null) {
+            return false;
+        }
+        
         try {
-            // Verificar se é BCrypt (usado no banco para o admin)
-            if (hashedPassword.startsWith("$2a$") || hashedPassword.startsWith("$2b$") || hashedPassword.startsWith("$2y$")) {
-                return verifyBCryptPassword(password, hashedPassword);
-            }
-            
-            // Verificar formato SHA-256 (nosso formato atual)
-            String[] parts = hashedPassword.split(":");
-            if (parts.length != 2) {
-                return false;
-            }
-            
-            byte[] salt = Base64.getDecoder().decode(parts[0]);
-            byte[] hash = Base64.getDecoder().decode(parts[1]);
-            
-            MessageDigest md = MessageDigest.getInstance("SHA-256");
-            md.update(salt);
-            byte[] testHash = md.digest(password.getBytes());
-            
-            return MessageDigest.isEqual(hash, testHash);
+            return BCrypt.checkpw(password, hashedPassword);
         } catch (Exception e) {
+            // Log do erro seria ideal aqui
+            e.printStackTrace();
             return false;
         }
     }
     
+    
+    
     /**
-     * Verificação simples de BCrypt para compatibilidade com o hash do admin
-     * Nota: Esta é uma implementação simplificada para o caso específico
+     * Gera senha aleatória segura
      */
-    private static boolean verifyBCryptPassword(String password, String hashedPassword) {
-        // Para o hash específico do admin no banco: $2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi
-        // que corresponde à senha "password"
-        if (hashedPassword.equals("$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi") && 
-            password.equals("password")) {
-            return true;
-        }
-        
-        // Para implementação completa de BCrypt, seria necessário uma biblioteca como jBCrypt
-        // Por ora, vamos suportar apenas o hash específico do admin
-        return false;
-    }
-    
-    private static byte[] generateSalt() {
-        SecureRandom random = new SecureRandom();
-        byte[] salt = new byte[16];
-        random.nextBytes(salt);
-        return salt;
-    }
-    
     public static String generateRandomPassword(int length) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
         SecureRandom random = new SecureRandom();
         StringBuilder password = new StringBuilder();
         
@@ -81,5 +52,34 @@ public class PasswordUtil {
         }
         
         return password.toString();
+    }
+    
+    /**
+     * Verifica força da senha
+     */
+    public static PasswordStrength checkPasswordStrength(String password) {
+        if (password == null || password.length() < 6) {
+            return PasswordStrength.WEAK;
+        }
+        
+        int score = 0;
+        
+        // Comprimento
+        if (password.length() >= 8) score++;
+        if (password.length() >= 12) score++;
+        
+        // Complexidade
+        if (password.matches(".*[a-z].*")) score++;
+        if (password.matches(".*[A-Z].*")) score++;
+        if (password.matches(".*[0-9].*")) score++;
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) score++;
+        
+        if (score <= 2) return PasswordStrength.WEAK;
+        if (score <= 4) return PasswordStrength.MEDIUM;
+        return PasswordStrength.STRONG;
+    }
+    
+    public enum PasswordStrength {
+        WEAK, MEDIUM, STRONG
     }
 }

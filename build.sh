@@ -91,7 +91,7 @@ print_message $GREEN "✓ Encontrados $JAVA_FILES arquivos Java"
 
 # Compilar código Java
 print_message $BLUE "Compilando código Java..."
-if find "$SRC_DIR" -name "*.java" -exec javac -cp "$CLASSPATH" -d "$CLASSES_DIR" -encoding UTF-8 {} +; then
+if find "$SRC_DIR" -name "*.java" -print0 | xargs -0 javac -cp "$CLASSPATH" -d "$CLASSES_DIR" -encoding UTF-8; then
     print_message $GREEN "✓ Compilação concluída com sucesso"
 else
     print_message $RED "✗ Erro na compilação"

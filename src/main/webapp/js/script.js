@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeMessages();
     initializeFormValidation();
     initializeAnimations();
-    initializeToastContainer();
+    initializeToastContainer(); // Garante que o container de toast exista
+    initializeCartButtons(); // Nova função para inicializar os botões do carrinho
 });
 
 // Navegação
@@ -281,7 +282,7 @@ function showMessage(message, type = 'info', duration = 5000) {
             if (messageDiv.parentNode) {
                 messageDiv.parentNode.removeChild(messageDiv);
             }
-        }, 300);
+        }, duration); // Usa a duração para o fade out também
     }, duration);
 }
 
@@ -291,6 +292,7 @@ function makeRequest(url, options = {}) {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest' // Adicionado para identificar requisições AJAX
         },
     };
     
@@ -400,7 +402,7 @@ const cart = {
         formData.append('bookId', bookId);
         formData.append('quantity', quantity);
         
-        return fetch('cart', {
+        return makeRequest('cart', {
             method: 'POST',
             body: formData
         })
@@ -423,7 +425,7 @@ const cart = {
     },
     
     remove: function(itemId) {
-        return fetch('cart', {
+        return makeRequest('cart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -448,19 +450,19 @@ const cart = {
     },
     
     updateQuantity: function(itemId, quantity) {
-        return fetch('cart', {
+        return makeRequest('cart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `action=updateQuantity&cartItemId=${itemId}&quantity=${quantity}`
+            body: `action=update&cartItemId=${itemId}&quantity=${quantity}` // Alterado 'updateQuantity' para 'update'
         })
         .then(response => response.json())
         .then(data => {
             if (data.success) {
                 this.updateCount();
             } else {
-                showToast('Erro ao atualizar quantidade', 'error');
+                showToast(data.message || 'Erro ao atualizar quantidade', 'error');
             }
             return data;
         })
@@ -472,7 +474,7 @@ const cart = {
     },
     
     clear: function() {
-        return fetch('cart', {
+        return makeRequest('cart', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -497,7 +499,7 @@ const cart = {
     },
     
     updateCount: function() {
-        return fetch('cart?action=count')
+        return makeRequest('cart?action=count')
             .then(response => response.json())
             .then(data => {
                 if (data.success && data.data) {
@@ -587,10 +589,11 @@ const cart = {
     // Função universal que detecta se o usuário está logado
     addItem: function(bookId, quantity = 1) {
         // Verificar se há elementos que indicam usuário logado
+        // Uma forma mais robusta seria verificar um atributo global ou cookie definido pelo backend após o login
         const userMenu = document.querySelector('.dropdown-toggle');
-        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
+        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar'; // heuristic, better to have a JS global var
         
-        console.log('Cart.addItem - Usuário logado:', isLoggedIn, 'BookID:', bookId, 'Quantity:', quantity);
+        console.log('Cart.addItem - Usuário logado (heurística):', isLoggedIn, 'BookID:', bookId, 'Quantity:', quantity);
         
         if (isLoggedIn) {
             // Usuário logado - usar servidor
@@ -604,11 +607,65 @@ const cart = {
     }
 };
 
+// Nova função para inicializar os botões de adicionar ao carrinho e de exclusão (admin)
+function initializeCartButtons() {
+    // Adicionar ao carrinho
+    document.querySelectorAll('.add-to-cart-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const bookId = this.dataset.bookId;
+            cart.addItem(bookId, 1); // Adiciona 1 unidade por padrão
+        });
+    });
+
+    // Excluir livro (botão admin)
+    document.querySelectorAll('.delete-book-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            if (confirm('Tem certeza que deseja excluir este livro? Esta ação é irreversível.')) {
+                const bookId = this.dataset.bookId;
+                
+                const formData = new FormData();
+                formData.append('action', 'delete');
+                formData.append('id', bookId);
+                
+                fetch('books', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (response.ok) {
+                        showToast('Livro excluído com sucesso!', 'success');
+                        // Remover o card do livro da DOM sem recarregar a página
+                        const bookCard = this.closest('.book-card');
+                        if (bookCard) {
+                            bookCard.remove();
+                        }
+                    } else {
+                        // Tentar ler a mensagem de erro do servidor
+                        return response.text().then(text => {
+                            try {
+                                const jsonError = JSON.parse(text);
+                                showToast(jsonError.message || 'Erro ao excluir livro.', 'error');
+                            } catch (e) {
+                                showToast('Erro ao excluir livro: ' + text, 'error');
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Erro:', error);
+                    showToast('Erro de comunicação com o servidor.', 'error');
+                });
+            }
+        });
+    });
+}
+
+
 // Lazy loading para imagens
 function initializeLazyLoading() {
     const images = document.querySelectorAll('img[data-src]');
     
-    const imageObserver = new IntersectionObserver((entries, observer) => {
+    const imageObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const img = entry.target;
@@ -729,7 +786,8 @@ function showToast(message, type = 'info', duration = 5000) {
     const container = document.getElementById('toast-container');
     if (!container) {
         initializeToastContainer();
-        return showToast(message, type, duration);
+        // Tentar novamente após garantir que o container existe
+        return showToast(message, type, duration); 
     }
     
     const toast = document.createElement('div');

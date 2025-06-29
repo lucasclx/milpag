@@ -1,6 +1,8 @@
 package com.milpaginas.listener;
 
-import com.milpaginas.util.DatabaseConnection;
+import com.milpaginas.util.DatabaseConnectionPool;
+
+
 
 import javax.servlet.ServletContextEvent;
 import javax.servlet.ServletContextListener;
@@ -12,7 +14,7 @@ public class ApplicationStartupListener implements ServletContextListener {
         System.out.println("=== Mil Páginas - Aplicação Iniciando ===");
         
         try {
-            boolean dbConnected = DatabaseConnection.testConnection();
+            boolean dbConnected = DatabaseConnectionPool.testConnection();
             if (dbConnected) {
                 System.out.println("✓ Conexão com banco de dados estabelecida com sucesso");
             } else {

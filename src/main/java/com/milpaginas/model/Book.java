@@ -16,6 +16,7 @@ public class Book {
     private String descricao;
     private LocalDateTime dataCadastro;
     private boolean ativo;
+    private int version;
     
     public Book() {
         this.ativo = true;
@@ -124,6 +125,14 @@ public class Book {
     
     public void setAtivo(boolean ativo) {
         this.ativo = ativo;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public void setVersion(int version) {
+        this.version = version;
     }
     
     public boolean isDisponivel() {

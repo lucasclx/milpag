@@ -28,7 +28,7 @@ public class CartServlet extends HttpServlet {
             throws ServletException, IOException {
         
         if (!isLoggedIn(request)) {
-            response.sendRedirect("login?redirect=cart");
+            sendJsonResponse(response, false, "Usuário não logado", null);
             return;
         }
         
@@ -147,6 +147,9 @@ public class CartServlet extends HttpServlet {
             CartItem cartItem = new CartItem(userId, bookId, quantity);
             cartDAO.addItem(cartItem);
             
+            // Decrementar estoque do livro
+            bookDAO.decreaseStock(bookId, quantity);
+            
             int cartCount = cartDAO.getCartItemCount(userId);
             Map<String, Object> data = new HashMap<>();
             data.put("cartCount", cartCount);
@@ -171,9 +174,47 @@ public class CartServlet extends HttpServlet {
         
         try {
             int cartItemId = Integer.parseInt(cartItemIdStr);
-            int quantity = Integer.parseInt(quantityStr);
+            int newQuantity = Integer.parseInt(quantityStr);
             
-            cartDAO.updateQuantity(cartItemId, quantity);
+            // Obter item do carrinho atual para verificar a quantidade antiga
+            CartItem existingCartItem = cartDAO.findById(cartItemId);
+            if (existingCartItem == null) {
+                sendJsonResponse(response, false, "Item do carrinho não encontrado", null);
+                return;
+            }
+            
+            int oldQuantity = existingCartItem.getQuantidade();
+            int bookId = existingCartItem.getLivroId();
+            
+            if (newQuantity <= 0) {
+                // Se a nova quantidade for 0 ou menos, remover o item e aumentar o estoque
+                cartDAO.removeItem(cartItemId);
+                bookDAO.increaseStock(bookId, oldQuantity);
+                sendJsonResponse(response, true, "Item removido do carrinho", null);
+            } else {
+                // Verificar estoque disponível antes de atualizar
+                Book book = bookDAO.findById(bookId);
+                if (book == null) {
+                    sendJsonResponse(response, false, "Livro não encontrado", null);
+                    return;
+                }
+                
+                int stockDifference = newQuantity - oldQuantity;
+                
+                if (stockDifference > 0) {
+                    // Aumentar a quantidade no carrinho, verificar estoque
+                    if (book.getQuantidadeEstoque() < stockDifference) {
+                        sendJsonResponse(response, false, "Quantidade insuficiente em estoque", null);
+                        return;
+                    }
+                    bookDAO.decreaseStock(bookId, stockDifference);
+                } else if (stockDifference < 0) {
+                    // Diminuir a quantidade no carrinho, devolver ao estoque
+                    bookDAO.increaseStock(bookId, Math.abs(stockDifference));
+                }
+                
+                cartDAO.updateQuantity(cartItemId, newQuantity);
+            }
             
             int userId = getUserId(request);
             int cartCount = cartDAO.getCartItemCount(userId);
@@ -199,7 +240,16 @@ public class CartServlet extends HttpServlet {
         
         try {
             int cartItemId = Integer.parseInt(cartItemIdStr);
+            
+            // Obter item do carrinho para devolver ao estoque
+            CartItem cartItem = cartDAO.findById(cartItemId);
+            if (cartItem == null) {
+                sendJsonResponse(response, false, "Item do carrinho não encontrado", null);
+                return;
+            }
+            
             cartDAO.removeItem(cartItemId);
+            bookDAO.increaseStock(cartItem.getLivroId(), cartItem.getQuantidade());
             
             int userId = getUserId(request);
             int cartCount = cartDAO.getCartItemCount(userId);
@@ -217,6 +267,13 @@ public class CartServlet extends HttpServlet {
             throws SQLException, IOException {
         
         int userId = getUserId(request);
+        
+        // Obter todos os itens do carrinho para devolver ao estoque
+        List<CartItem> cartItems = cartDAO.findByUserId(userId);
+        for (CartItem item : cartItems) {
+            bookDAO.increaseStock(item.getLivroId(), item.getQuantidade());
+        }
+        
         cartDAO.clearCart(userId);
         
         Map<String, Object> data = new HashMap<>();

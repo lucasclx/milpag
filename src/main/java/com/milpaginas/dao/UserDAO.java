@@ -1,7 +1,7 @@
 package com.milpaginas.dao;
 
 import com.milpaginas.model.User;
-import com.milpaginas.util.DatabaseConnection;
+import com.milpaginas.util.DatabaseConnectionPool;
 import com.milpaginas.util.ValidationUtil;
 
 import java.sql.*;
@@ -14,7 +14,7 @@ public class UserDAO {
     public User save(User user) throws SQLException {
         String sql = "INSERT INTO usuarios (nome, email, senha, endereco, telefone, tipo_usuario) VALUES (?, ?, ?, ?, ?, ?)";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             
             stmt.setString(1, ValidationUtil.sanitizeString(user.getNome()));
@@ -45,7 +45,7 @@ public class UserDAO {
     public User findById(int id) throws SQLException {
         String sql = "SELECT * FROM usuarios WHERE id = ? AND ativo = TRUE";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, id);
@@ -63,7 +63,7 @@ public class UserDAO {
     public User findByEmail(String email) throws SQLException {
         String sql = "SELECT * FROM usuarios WHERE email = ? AND ativo = TRUE";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, email);
@@ -82,7 +82,7 @@ public class UserDAO {
         String sql = "SELECT * FROM usuarios WHERE ativo = TRUE ORDER BY nome";
         List<User> users = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql);
              ResultSet rs = stmt.executeQuery()) {
             
@@ -98,7 +98,7 @@ public class UserDAO {
         String sql = "SELECT * FROM usuarios WHERE tipo_usuario = ? AND ativo = TRUE ORDER BY nome";
         List<User> users = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, userType.name());
@@ -116,7 +116,7 @@ public class UserDAO {
     public User update(User user) throws SQLException {
         String sql = "UPDATE usuarios SET nome = ?, email = ?, endereco = ?, telefone = ?, tipo_usuario = ? WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, ValidationUtil.sanitizeString(user.getNome()));
@@ -139,7 +139,7 @@ public class UserDAO {
     public void updatePassword(int userId, String newHashedPassword) throws SQLException {
         String sql = "UPDATE usuarios SET senha = ? WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, newHashedPassword);
@@ -156,7 +156,7 @@ public class UserDAO {
     public void delete(int id) throws SQLException {
         String sql = "UPDATE usuarios SET ativo = FALSE WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, id);
@@ -172,7 +172,7 @@ public class UserDAO {
     public boolean emailExists(String email) throws SQLException {
         String sql = "SELECT COUNT(*) FROM usuarios WHERE email = ? AND ativo = TRUE";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setString(1, email);

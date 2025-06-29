@@ -219,7 +219,7 @@
                 addToCartBtn.addEventListener('click', function() {
                     const bookId = this.getAttribute('data-book-id');
                     const quantity = document.getElementById('quantity').value;
-                    addToCart(bookId, quantity);
+                    addToCart(bookId, quantity, event);
                 });
             }
             
@@ -246,7 +246,10 @@
             }
         }
         
-        function addToCart(bookId, quantity) {
+        function addToCart(bookId, quantity, event) {
+            if (typeof addToCartGlobal === 'function') {
+                addToCartGlobal(bookId, quantity, event);
+            } else {
             const formData = new FormData();
             formData.append('action', 'add');
             formData.append('bookId', bookId);
@@ -259,12 +262,12 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    showMessage('Livro adicionado ao carrinho!', 'success');
+                    showNotification('Livro adicionado ao carrinho!', 'success');
                     if (typeof updateCartCount === 'function') {
                         updateCartCount();
                     }
                 } else {
-                    showMessage(data.message || 'Erro ao adicionar ao carrinho', 'error');
+                    showNotification(data.message || 'Erro ao adicionar ao carrinho', 'error');
                 }
             })
             .catch(error => {

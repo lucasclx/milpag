@@ -43,9 +43,6 @@ public class BookServlet extends HttpServlet {
                 case "edit":
                     showEditForm(request, response);
                     break;
-                case "delete":
-                    deleteBook(request, response);
-                    break;
                 default:
                     listBooks(request, response);
             }
@@ -73,6 +70,9 @@ public class BookServlet extends HttpServlet {
                     break;
                 case "edit":
                     editBook(request, response);
+                    break;
+                case "delete":
+                    deleteBook(request, response);
                     break;
                 default:
                     response.sendRedirect("books");

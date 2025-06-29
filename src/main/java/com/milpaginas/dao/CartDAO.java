@@ -2,7 +2,7 @@ package com.milpaginas.dao;
 
 import com.milpaginas.model.CartItem;
 import com.milpaginas.model.Book;
-import com.milpaginas.util.DatabaseConnection;
+import com.milpaginas.util.DatabaseConnectionPool;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -17,7 +17,11 @@ public class CartDAO {
         String insertSql = "INSERT INTO carrinho (usuario_id, livro_id, quantidade) VALUES (?, ?, ?)";
         String updateSql = "UPDATE carrinho SET quantidade = quantidade + ? WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection()) {
+        Connection conn = null;
+        try {
+            conn = DatabaseConnectionPool.getConnection();
+            conn.setAutoCommit(false);
+
             try (PreparedStatement checkStmt = conn.prepareStatement(checkSql)) {
                 checkStmt.setInt(1, cartItem.getUsuarioId());
                 checkStmt.setInt(2, cartItem.getLivroId());
@@ -48,6 +52,16 @@ public class CartDAO {
                     }
                 }
             }
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                conn.rollback();
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.close();
+            }
         }
         
         return cartItem;
@@ -61,7 +75,7 @@ public class CartDAO {
         
         List<CartItem> cartItems = new ArrayList<>();
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);
@@ -82,11 +96,31 @@ public class CartDAO {
                     "JOIN livros l ON c.livro_id = l.id " +
                     "WHERE c.usuario_id = ? AND c.livro_id = ? AND l.ativo = TRUE";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);
             stmt.setInt(2, bookId);
+            
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    return mapResultSetToCartItem(rs);
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    public CartItem findById(int cartItemId) throws SQLException {
+        String sql = "SELECT c.*, l.titulo, l.autor, l.preco, l.url_capa FROM carrinho c " +
+                     "JOIN livros l ON c.livro_id = l.id " +
+                     "WHERE c.id = ? AND l.ativo = TRUE";
+        
+        try (Connection conn = DatabaseConnectionPool.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            
+            stmt.setInt(1, cartItemId);
             
             try (ResultSet rs = stmt.executeQuery()) {
                 if (rs.next()) {
@@ -106,16 +140,29 @@ public class CartDAO {
         
         String sql = "UPDATE carrinho SET quantidade = ? WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, newQuantity);
-            stmt.setInt(2, cartItemId);
-            
-            int affectedRows = stmt.executeUpdate();
-            
-            if (affectedRows == 0) {
-                throw new SQLException("Falha ao atualizar quantidade, item não encontrado.");
+        Connection conn = null;
+        try {
+            conn = DatabaseConnectionPool.getConnection();
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, newQuantity);
+                stmt.setInt(2, cartItemId);
+                
+                int affectedRows = stmt.executeUpdate();
+                
+                if (affectedRows == 0) {
+                    throw new SQLException("Falha ao atualizar quantidade, item não encontrado.");
+                }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                conn.rollback();
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.close();
             }
         }
     }
@@ -123,15 +170,28 @@ public class CartDAO {
     public void removeItem(int cartItemId) throws SQLException {
         String sql = "DELETE FROM carrinho WHERE id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql)) {
-            
-            stmt.setInt(1, cartItemId);
-            
-            int affectedRows = stmt.executeUpdate();
-            
-            if (affectedRows == 0) {
-                throw new SQLException("Falha ao remover item, item não encontrado.");
+        Connection conn = null;
+        try {
+            conn = DatabaseConnectionPool.getConnection();
+            conn.setAutoCommit(false);
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, cartItemId);
+                
+                int affectedRows = stmt.executeUpdate();
+                
+                if (affectedRows == 0) {
+                    throw new SQLException("Falha ao remover item, item não encontrado.");
+                }
+            }
+            conn.commit();
+        } catch (SQLException e) {
+            if (conn != null) {
+                conn.rollback();
+            }
+            throw e;
+        } finally {
+            if (conn != null) {
+                conn.close();
             }
         }
     }
@@ -139,7 +199,7 @@ public class CartDAO {
     public void removeByUserAndBook(int userId, int bookId) throws SQLException {
         String sql = "DELETE FROM carrinho WHERE usuario_id = ? AND livro_id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);
@@ -152,7 +212,7 @@ public class CartDAO {
     public void clearCart(int userId) throws SQLException {
         String sql = "DELETE FROM carrinho WHERE usuario_id = ?";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);
@@ -165,7 +225,7 @@ public class CartDAO {
                     "JOIN livros l ON c.livro_id = l.id " +
                     "WHERE c.usuario_id = ? AND l.ativo = TRUE";
         
-        try (Connection conn = DatabaseConnection.getConnection();
+        try (Connection conn = DatabaseConnectionPool.getConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
             
             stmt.setInt(1, userId);

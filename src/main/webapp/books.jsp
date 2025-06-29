@@ -145,32 +145,24 @@
                                             </div>
                                             
                                             <div class="book-actions">
-                                                <a href="books?action=view&id=${book.id}" class="btn btn-outline btn-small">
-                                                    Ver Detalhes
-                                                </a>
-                                                
-                                                <c:if test="${not empty sessionScope.user && book.quantidadeEstoque > 0}">
-                                                    <button class="btn btn-primary btn-small add-to-cart-btn" 
-                                                            data-book-id="${book.id}">
-                                                        <i class="fas fa-cart-plus"></i>
-                                                        Adicionar
-                                                    </button>
-                                                </c:if>
-                                                
-                                                <c:if test="${sessionScope.isAdmin}">
-                                                    <div class="admin-actions">
-                                                        <a href="books?action=edit&id=${book.id}" 
-                                                           class="btn btn-warning btn-small">
-                                                            <i class="fas fa-edit"></i>
-                                                        </a>
-                                                        <button class="btn btn-danger btn-small delete-book-btn" 
-                                                                data-book-id="${book.id}"
-                                                                data-book-title="${book.titulo}">
-                                                            <i class="fas fa-trash"></i>
-                                                        </button>
-                                                    </div>
-                                                </c:if>
-                                            </div>
+                <a href="books?action=view&id=${book.id}" class="btn btn-sm btn-outline">Ver Detalhes</a>
+                
+                <%-- Lógica para exibir botões de ADMIN apenas se o usuário for ADMIN --%>
+                <c:if test="${sessionScope.isAdmin == true}">
+                    <a href="books?action=edit&id=${book.id}" class="btn btn-sm btn-warning">
+                        <i class="fas fa-edit"></i> Editar
+                    </a>
+                    <button class="btn btn-sm btn-danger delete-book-btn" data-book-id="${book.id}">
+                        <i class="fas fa-trash-alt"></i> Excluir
+                    </button>
+                </c:if>
+
+                <%-- Botão Adicionar ao Carrinho --%>
+                <%-- O botão é sempre visível, a lógica de login/localstorage é tratada no JS --%>
+                <button class="btn btn-sm btn-primary add-to-cart-btn" data-book-id="${book.id}">
+                    <i class="fas fa-cart-plus"></i> Adicionar
+                </button>
+            </div>
                                         </div>
                                     </div>
                                 </c:forEach>
@@ -237,7 +229,7 @@
                     
                     // Usar a função global do header se disponível
                     if (typeof addToCartGlobal === 'function') {
-                        addToCartGlobal(bookId, 1);
+                        addToCartGlobal(bookId, 1, event);
                     } else if (typeof MilPaginas !== 'undefined' && MilPaginas.cart) {
                         // Fallback para o sistema local
                         MilPaginas.cart.addItem(bookId, 1);

@@ -33,6 +33,17 @@ public class AuthenticationFilter implements Filter {
         
         if (!isLoggedIn && (isAdminPath || isProtectedPath)) {
             String loginURL = contextPath + "/login";
+            
+            // Check if it's an AJAX request
+            String xRequestedWith = httpRequest.getHeader("X-Requested-With");
+            if ("XMLHttpRequest".equals(xRequestedWith)) {
+                httpResponse.setContentType("application/json");
+                httpResponse.setCharacterEncoding("UTF-8");
+                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                httpResponse.getWriter().write("{\"success\":false, \"message\":\"Usuário não autenticado.\"}");
+                return;
+            }
+
             if (isProtectedPath) {
                 loginURL += "?redirect=" + requestURI;
             }

@@ -73,22 +73,22 @@
                                                 <strong>Total: <span id="mini-cart-total">R$ 0,00</span></strong>
                                             </div>
                                             <div class="mini-cart-actions">
-                                                <a href="cart" class="btn btn-outline btn-small">Ver Carrinho</a>
-                                                <a href="orders?action=checkout" class="btn btn-primary btn-small">Finalizar</a>
+                                                <a href="cart" class="btn btn-outline btn-sm">Ver Carrinho</a>
+                                                <a href="orders?action=checkout" class="btn btn-primary btn-sm">Finalizar</a>
                                             </div>
                                         </div>
                                     </div>
                                     <div class="mini-cart-empty" id="mini-cart-empty" style="display: none;">
                                         <i class="fas fa-shopping-cart"></i>
                                         <p>Seu carrinho está vazio</p>
-                                        <a href="books" class="btn btn-primary btn-small">Continuar Comprando</a>
+                                        <a href="books" class="btn btn-primary btn-sm">Continuar Comprando</a>
                                     </div>
                                 </div>
                             </li>
                         </c:when>
                         <c:otherwise>
                             <li><a href="login">Entrar</a></li>
-                            <li><a href="register" class="btn btn-primary btn-small">Cadastrar</a></li>
+                            <li><a href="register" class="btn btn-primary btn-sm">Cadastrar</a></li>
                         </c:otherwise>
                     </c:choose>
                 </ul>
@@ -135,41 +135,18 @@
     });
     
     function updateCartCount() {
-        // Detectar se usuário está logado via DOM
-        const userMenu = document.querySelector('.dropdown-toggle');
-        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
-        
-        if (isLoggedIn) {
-            // Para usuários logados, buscar do servidor
-            fetch('cart?action=count')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data) {
-                        const cartCountElement = document.getElementById('cart-count');
-                        if (cartCountElement) {
-                            cartCountElement.textContent = data.data.cartCount || 0;
-                        }
+        MilPaginas.makeRequest('cart?action=count')
+            .then(data => {
+                if (data.success && data.data) {
+                    const cartCountElement = document.getElementById('cart-count');
+                    if (cartCountElement) {
+                        cartCountElement.textContent = data.data.cartCount || 0;
                     }
-                })
-                .catch(error => {
-                    console.error('Erro ao atualizar contador do carrinho:', error);
-                    // Fallback para localStorage
-                    updateLocalStorageCount();
-                });
-        } else {
-            // Para usuários não logados, usar localStorage
-            updateLocalStorageCount();
-        }
-    }
-    
-    function updateLocalStorageCount() {
-        const cartItems = MilPaginas.storage.get('cart_items', []);
-        const totalCount = cartItems.reduce((total, item) => total + item.quantity, 0);
-        
-        const cartCountElement = document.getElementById('cart-count');
-        if (cartCountElement) {
-            cartCountElement.textContent = totalCount;
-        }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao atualizar contador do carrinho:', error);
+            });
     }
     
     // Funções do Mini Carrinho
@@ -212,66 +189,18 @@
     }
     
     function loadMiniCartItems() {
-        // Detectar se usuário está logado via DOM (mais confiável)
-        const userMenu = document.querySelector('.dropdown-toggle');
-        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
-        
-        if (isLoggedIn) {
-            // Para usuários logados, buscar do servidor
-            fetch('cart?action=json')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.data && data.data.items) {
-                        displayMiniCartItems(data.data.items);
-                    } else {
-                        showEmptyMiniCart();
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao carregar itens do carrinho:', error);
-                    // Fallback para localStorage
-                    loadFromLocalStorage();
-                });
-        } else {
-            // Para usuários não logados, usar localStorage
-            loadFromLocalStorage();
-        }
-    }
-    
-    function loadFromLocalStorage() {
-        const cartItems = MilPaginas.storage.get('cart_items', []);
-        if (cartItems.length > 0) {
-            // Buscar detalhes dos livros do servidor
-            const bookIds = cartItems.map(item => item.bookId);
-            fetch('books?action=details&ids=' + bookIds.join(','))
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.books) {
-                        const items = cartItems.map(cartItem => {
-                            const book = data.books.find(b => b.id == cartItem.bookId);
-                            return book ? {
-                                id: book.id,
-                                title: book.titulo,
-                                author: book.autor,
-                                price: book.preco,
-                                quantity: cartItem.quantity,
-                                image: book.urlCapa || 'images/book-placeholder.jpg'
-                            } : null;
-                        }).filter(item => item !== null);
-                        
-                        displayMiniCartItems(items);
-                        updateLocalStorageCount(items.length);
-                    } else {
-                        showEmptyMiniCart();
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao buscar detalhes dos livros:', error);
+        MilPaginas.makeRequest('cart?action=json')
+            .then(data => {
+                if (data.success && data.data && data.data.items) {
+                    displayMiniCartItems(data.data.items);
+                } else {
                     showEmptyMiniCart();
-                });
-        } else {
-            showEmptyMiniCart();
-        }
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao carregar itens do carrinho:', error);
+                showEmptyMiniCart();
+            });
     }
     
     function displayMiniCartItems(items) {
@@ -325,37 +254,26 @@
     }
     
     function removeFromMiniCart(itemId) {
-        // Detectar se usuário está logado via DOM
-        const userMenu = document.querySelector('.dropdown-toggle');
-        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
-        
-        if (isLoggedIn) {
-            // Usuário logado - remover do servidor
-            fetch('cart', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                },
-                body: `action=remove&cartItemId=${itemId}`
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    loadMiniCartItems();
-                    updateCartCount();
-                    showNotification('Item removido do carrinho', 'success');
-                } else {
-                    showNotification('Erro ao remover item', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Erro ao remover item:', error);
+        MilPaginas.makeRequest('cart', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `action=remove&cartItemId=${itemId}`
+        })
+        .then(data => {
+            if (data.success) {
+                loadMiniCartItems();
+                updateCartCount();
+                showNotification('Item removido do carrinho', 'success');
+            } else {
                 showNotification('Erro ao remover item', 'error');
-            });
-        } else {
-            // Usuário não logado - remover do localStorage
-            removeFromLocalStorageCart(itemId);
-        }
+            }
+        })
+        .catch(error => {
+            console.error('Erro ao remover item:', error);
+            showNotification('Erro ao remover item', 'error');
+        });
     }
     
     function showNotification(message, type) {
@@ -366,94 +284,44 @@
         }
     }
     
-    // Funções para localStorage
-    function addToLocalStorageCart(bookId, quantity = 1) {
-        const cartItems = MilPaginas.storage.get('cart_items', []);
-        const existingItem = cartItems.find(item => item.bookId == bookId);
-        
-        if (existingItem) {
-            existingItem.quantity += quantity;
-        } else {
-            cartItems.push({ bookId: parseInt(bookId), quantity: quantity });
-        }
-        
-        MilPaginas.storage.set('cart_items', cartItems);
-        updateLocalStorageCount(cartItems.reduce((total, item) => total + item.quantity, 0));
-        showNotification('Livro adicionado ao carrinho!', 'success');
-    }
-    
-    function removeFromLocalStorageCart(bookId) {
-        const cartItems = MilPaginas.storage.get('cart_items', []);
-        const filteredItems = cartItems.filter(item => item.bookId != bookId);
-        
-        MilPaginas.storage.set('cart_items', filteredItems);
-        updateLocalStorageCount(filteredItems.reduce((total, item) => total + item.quantity, 0));
-        loadMiniCartItems();
-        showNotification('Item removido do carrinho', 'success');
-    }
-    
-    function updateLocalStorageCount(count) {
-        const cartCountElement = document.getElementById('cart-count');
-        if (cartCountElement) {
-            cartCountElement.textContent = count || 0;
-        }
-    }
-    
-    function clearLocalStorageCart() {
-        MilPaginas.storage.remove('cart_items');
-        updateLocalStorageCount(0);
-    }
-    
     // Função global para adicionar ao carrinho (usada em outras páginas)
-    window.addToCartGlobal = function(bookId, quantity = 1) {
+    window.addToCartGlobal = function(bookId, quantity = 1, event) {
+        const button = event ? event.currentTarget : null;
         console.log('addToCartGlobal chamada - BookID:', bookId, 'Quantity:', quantity);
         
-        // Usar a lógica unificada do MilPaginas.cart se disponível
-        if (typeof MilPaginas !== 'undefined' && MilPaginas.cart && MilPaginas.cart.addItem) {
-            console.log('Usando MilPaginas.cart.addItem');
-            return MilPaginas.cart.addItem(bookId, quantity);
-        }
+        // Enviar para servidor
+        if (button) button.classList.add('loading');
+        const formData = new FormData();
+        formData.append('action', 'add');
+        formData.append('bookId', bookId);
+        formData.append('quantity', quantity);
         
-        console.log('MilPaginas não disponível, usando fallback JSP');
-        
-        // Fallback baseado no estado da sessão JSP
-        <c:choose>
-            <c:when test="${not empty sessionScope.user}">
-                // Usuário logado - enviar para servidor
-                const formData = new FormData();
-                formData.append('action', 'add');
-                formData.append('bookId', bookId);
-                formData.append('quantity', quantity);
-                
-                fetch('cart', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showNotification('Livro adicionado ao carrinho!', 'success');
-                        updateCartCount();
-                        // Animar contador
-                        const cartCountElement = document.getElementById('cart-count');
-                        if (cartCountElement) {
-                            cartCountElement.classList.add('animated');
-                            setTimeout(() => cartCountElement.classList.remove('animated'), 300);
-                        }
-                    } else {
-                        showNotification(data.message || 'Erro ao adicionar ao carrinho', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro:', error);
-                    showNotification('Erro ao adicionar ao carrinho', 'error');
-                });
-            </c:when>
-            <c:otherwise>
-                // Usuário não logado - usar localStorage
-                addToLocalStorageCart(bookId, quantity);
-            </c:otherwise>
-        </c:choose>
+        fetch('cart', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('Livro adicionado ao carrinho!', 'success');
+                updateCartCount();
+                // Animar contador
+                const cartCountElement = document.getElementById('cart-count');
+                if (cartCountElement) {
+                    cartCountElement.classList.add('animated');
+                    setTimeout(() => cartCountElement.classList.remove('animated'), 300);
+                }
+            } else {
+                showNotification(data.message || 'Erro ao adicionar ao carrinho', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Erro:', error);
+            showNotification('Erro ao adicionar ao carrinho', 'error');
+        })
+        .finally(() => {
+            if (button) button.classList.remove('loading');
+        });
     };
     
     // Garantir que o sistema esteja disponível globalmente
