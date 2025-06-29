@@ -586,12 +586,20 @@ const cart = {
     
     // Função universal que detecta se o usuário está logado
     addItem: function(bookId, quantity = 1) {
-        // Esta função será chamada pelo addToCartGlobal no header
-        if (typeof addToCartGlobal === 'function') {
-            return addToCartGlobal(bookId, quantity);
+        // Verificar se há elementos que indicam usuário logado
+        const userMenu = document.querySelector('.dropdown-toggle');
+        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
+        
+        console.log('Cart.addItem - Usuário logado:', isLoggedIn, 'BookID:', bookId, 'Quantity:', quantity);
+        
+        if (isLoggedIn) {
+            // Usuário logado - usar servidor
+            console.log('Usando servidor para adicionar ao carrinho');
+            return this.add(bookId, quantity);
         } else {
-            // Fallback para localStorage
-            this.addToLocal(bookId, quantity);
+            // Usuário não logado - usar localStorage
+            console.log('Usando localStorage para adicionar ao carrinho');
+            return this.addToLocal(bookId, quantity);
         }
     }
 };

@@ -234,7 +234,17 @@
             addToCartButtons.forEach(btn => {
                 btn.addEventListener('click', function() {
                     const bookId = this.getAttribute('data-book-id');
-                    addToCart(bookId, 1);
+                    
+                    // Usar a função global do header se disponível
+                    if (typeof addToCartGlobal === 'function') {
+                        addToCartGlobal(bookId, 1);
+                    } else if (typeof MilPaginas !== 'undefined' && MilPaginas.cart) {
+                        // Fallback para o sistema local
+                        MilPaginas.cart.addItem(bookId, 1);
+                    } else {
+                        // Último fallback
+                        addToCart(bookId, 1);
+                    }
                 });
             });
             

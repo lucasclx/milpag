@@ -103,9 +103,8 @@
 
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        <c:if test="${not empty sessionScope.user}">
-            updateCartCount();
-        </c:if>
+        // Sempre atualizar o contador - a função detecta automaticamente o estado
+        updateCartCount();
         
         // Mobile menu toggle
         const mobileToggle = document.querySelector('.mobile-menu-toggle');
@@ -136,17 +135,41 @@
     });
     
     function updateCartCount() {
-        fetch('cart?action=count')
-            .then(response => response.json())
-            .then(data => {
-                if (data.success && data.data) {
-                    const cartCountElement = document.getElementById('cart-count');
-                    if (cartCountElement) {
-                        cartCountElement.textContent = data.data.cartCount || 0;
+        // Detectar se usuário está logado via DOM
+        const userMenu = document.querySelector('.dropdown-toggle');
+        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
+        
+        if (isLoggedIn) {
+            // Para usuários logados, buscar do servidor
+            fetch('cart?action=count')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.data) {
+                        const cartCountElement = document.getElementById('cart-count');
+                        if (cartCountElement) {
+                            cartCountElement.textContent = data.data.cartCount || 0;
+                        }
                     }
-                }
-            })
-            .catch(error => console.error('Erro ao atualizar contador do carrinho:', error));
+                })
+                .catch(error => {
+                    console.error('Erro ao atualizar contador do carrinho:', error);
+                    // Fallback para localStorage
+                    updateLocalStorageCount();
+                });
+        } else {
+            // Para usuários não logados, usar localStorage
+            updateLocalStorageCount();
+        }
+    }
+    
+    function updateLocalStorageCount() {
+        const cartItems = MilPaginas.storage.get('cart_items', []);
+        const totalCount = cartItems.reduce((total, item) => total + item.quantity, 0);
+        
+        const cartCountElement = document.getElementById('cart-count');
+        if (cartCountElement) {
+            cartCountElement.textContent = totalCount;
+        }
     }
     
     // Funções do Mini Carrinho
@@ -189,8 +212,12 @@
     }
     
     function loadMiniCartItems() {
-        // Para usuários logados, buscar do servidor
-        <c:if test="${not empty sessionScope.user}">
+        // Detectar se usuário está logado via DOM (mais confiável)
+        const userMenu = document.querySelector('.dropdown-toggle');
+        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
+        
+        if (isLoggedIn) {
+            // Para usuários logados, buscar do servidor
             fetch('cart?action=json')
                 .then(response => response.json())
                 .then(data => {
@@ -205,12 +232,10 @@
                     // Fallback para localStorage
                     loadFromLocalStorage();
                 });
-        </c:if>
-        
-        // Para usuários não logados, usar localStorage
-        <c:if test="${empty sessionScope.user}">
+        } else {
+            // Para usuários não logados, usar localStorage
             loadFromLocalStorage();
-        </c:if>
+        }
     }
     
     function loadFromLocalStorage() {
@@ -300,36 +325,37 @@
     }
     
     function removeFromMiniCart(itemId) {
-        <c:choose>
-            <c:when test="${not empty sessionScope.user}">
-                // Usuário logado - remover do servidor
-                fetch('cart', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
-                    body: `action=remove&cartItemId=${itemId}`
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        loadMiniCartItems();
-                        updateCartCount();
-                        showNotification('Item removido do carrinho', 'success');
-                    } else {
-                        showNotification('Erro ao remover item', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erro ao remover item:', error);
+        // Detectar se usuário está logado via DOM
+        const userMenu = document.querySelector('.dropdown-toggle');
+        const isLoggedIn = userMenu && userMenu.textContent.trim() !== 'Entrar';
+        
+        if (isLoggedIn) {
+            // Usuário logado - remover do servidor
+            fetch('cart', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `action=remove&cartItemId=${itemId}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    loadMiniCartItems();
+                    updateCartCount();
+                    showNotification('Item removido do carrinho', 'success');
+                } else {
                     showNotification('Erro ao remover item', 'error');
-                });
-            </c:when>
-            <c:otherwise>
-                // Usuário não logado - remover do localStorage
-                removeFromLocalStorageCart(itemId);
-            </c:otherwise>
-        </c:choose>
+                }
+            })
+            .catch(error => {
+                console.error('Erro ao remover item:', error);
+                showNotification('Erro ao remover item', 'error');
+            });
+        } else {
+            // Usuário não logado - remover do localStorage
+            removeFromLocalStorageCart(itemId);
+        }
     }
     
     function showNotification(message, type) {
@@ -380,6 +406,17 @@
     
     // Função global para adicionar ao carrinho (usada em outras páginas)
     window.addToCartGlobal = function(bookId, quantity = 1) {
+        console.log('addToCartGlobal chamada - BookID:', bookId, 'Quantity:', quantity);
+        
+        // Usar a lógica unificada do MilPaginas.cart se disponível
+        if (typeof MilPaginas !== 'undefined' && MilPaginas.cart && MilPaginas.cart.addItem) {
+            console.log('Usando MilPaginas.cart.addItem');
+            return MilPaginas.cart.addItem(bookId, quantity);
+        }
+        
+        console.log('MilPaginas não disponível, usando fallback JSP');
+        
+        // Fallback baseado no estado da sessão JSP
         <c:choose>
             <c:when test="${not empty sessionScope.user}">
                 // Usuário logado - enviar para servidor
@@ -397,6 +434,12 @@
                     if (data.success) {
                         showNotification('Livro adicionado ao carrinho!', 'success');
                         updateCartCount();
+                        // Animar contador
+                        const cartCountElement = document.getElementById('cart-count');
+                        if (cartCountElement) {
+                            cartCountElement.classList.add('animated');
+                            setTimeout(() => cartCountElement.classList.remove('animated'), 300);
+                        }
                     } else {
                         showNotification(data.message || 'Erro ao adicionar ao carrinho', 'error');
                     }
@@ -413,11 +456,12 @@
         </c:choose>
     };
     
-    // Inicializar contador na página inicial
-    document.addEventListener('DOMContentLoaded', function() {
-        <c:if test="${empty sessionScope.user}">
-            const cartItems = MilPaginas.storage.get('cart_items', []);
-            updateLocalStorageCount(cartItems.reduce((total, item) => total + item.quantity, 0));
-        </c:if>
+    // Garantir que o sistema esteja disponível globalmente
+    window.addEventListener('load', function() {
+        // Certificar que MilPaginas está disponível e depois inicializar
+        if (typeof MilPaginas !== 'undefined') {
+            // Re-atualizar contador após todos os scripts carregarem
+            setTimeout(updateCartCount, 100);
+        }
     });
 </script>
